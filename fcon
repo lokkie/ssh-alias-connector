@@ -1,0 +1,200 @@
+#!/bin/bash
+
+connectionsList="${HOME}/.fcon.lst"
+configFile="${HOME}/.fcon.cfg"
+tmpFile='/tmp/__fcon__lst__tmp'
+pathValue=$PATH
+
+function printHelp {
+	echo "SSH connection tool"
+	echo "Usage:" $'\n'
+	echo "scon <connection-name>"
+	echo "scon --add"
+	echo "scon --delete <connection-name>" $'\n'
+	echo " --configure - (Re-)Configure application"
+	echo " --add - Starts connection adding procedure"
+	echo " --delele - Removes connection from config" $'\n'
+	echo " <connection-name> - one of connection name from ${connectionsList}:"
+	while read l; do
+		n=`cut -d':' -f1 <<< $l`
+		d=`cut -d':' -f4 <<< $l`
+		printf "\t%-10s %s" ${n}
+		echo " - ${d}"
+	done <${connectionsList}
+	echo ""
+	exit 	
+}
+
+function isInstalled {
+	echo "Searching installation..."
+	for path in `echo ${pathValue} | tr ':' "\n"`; do
+		if [ -f "${path}/fcon" ]; then
+			echo "Found at ${path}/fcon"
+			return 0
+		fi
+	done
+	return 1
+}
+
+function setupBinDir {
+	echo "Could not find any writable dir in path."
+	echo "Do you want to create bin directory in home path? (yes/no) [yes]"
+	read answer
+	case $answer in 
+		""  | "yes" | "y")
+			mkdir "${HOME}/bin"
+			echo "export PATH=\$PATH:${HOME}/bin" >> $HOME/.profile
+			export PATH=$PATH:$HOME/bin
+			;;
+		"no" | "n")
+			return 1
+			;;
+		*)
+			echo "Sorry, I do not understand you. Let's try again"
+			return setupBinDir
+			;;
+	esac
+}
+
+function createList {
+	if [ ! -f "${connectionsList}" ]; then
+		touch $connectionsList
+		echo "It's time to setup your first connection"
+		addNew
+	fi	
+}
+
+function install {
+	if isInstalled; then
+		echo "FCon is already installed"
+		exit
+	fi
+	writablePath=()
+	for path in `echo ${pathValue} | tr ':' "\n"`; do
+		if [ -w "${path}" ]; then
+			writablePath+=($path)
+		fi
+	done
+	if [ "${#writablePath[@]}" == "0" ]; then
+		if ! setupBinDir; then
+			echo "Installation was terminated. Sorry"
+			exit
+		else
+			writablePath+=("$HOME/bin")
+		fi
+	fi
+	echo "Where do you want to install FCon?"
+	for index in "${!writablePath[@]}"; do
+		echo "${index}) ${writablePath[$index]}"
+	done
+	read choise
+	installDir=${writablePath[$choise]}
+	echo "Using ${installDir} to install"
+	cp $0 "${installDir}/fcon"
+	chmod +x "${installDir}/fcon"
+	configure
+	createList
+	echo "Installation is complete. Now you can use FCon" $'\n'
+	printHelp
+}
+
+function configure {
+	systemUser=$(whoami)
+	echo "Enter default user for connectoion [${systemUser}]"
+	read defaultUser
+	if [ "$defaultUser" == "" ]; then defaultUser=$systemUser; fi
+	echo "export defaultUser='${defaultUser}'" > $configFile
+}
+
+function addNew {
+	echo "Creating new connection"
+	echo "Type short name for connection:"
+	read name
+	echo "Type short description for connection:"
+	read description
+	echo "Type connection host:"
+	read host
+	echo "Type connection port [2222]:"
+	read port
+	if [ "$port" == "" ]; then port="2222"; fi
+	echo "Type user (blank for default: ${defaultUser}):"
+	read user
+	connectionString="$name:$port:$host:$description"
+	if [ "$user" != "" ]; then connectionString+=":$user"; fi 
+	echo "Adding record [$connectionString]"
+	echo "$connectionString" >> $connectionsList
+	echo "Done"
+	exit
+}
+
+function exists {
+	found=`cat ${connectionsList} | grep ^$1:`
+	if [ "$found" == "" ]; then
+		return 1
+	else
+		return 0
+	fi
+	
+}
+
+function delete {
+	if exists $1; then
+		cat ${connectionsList} | grep -v ^$1: > ${tmpFile}
+		cat ${tmpFile} > ${connectionsList}
+		rm ${tmpFile}
+		echo "Record [$1] removed from list"
+	else
+		echo "Connection [$1] not found"
+		printHelp		
+	fi
+	# exit
+}
+
+function connect {
+	if exists $1; then
+		search="$1"
+		connectionLine=`cat ${connectionsList} | grep ^$search:`
+		
+		host=`cut -d':' -f3 <<< $connectionLine`
+		port=`cut -d':' -f2 <<< $connectionLine`
+		name=`cut -d':' -f1 <<< $connectionLine`
+		desc=`cut -d':' -f4 <<< $connectionLine`
+		user=`cut -d':' -f5 <<< $connectionLine`
+		if [ "$user" == "" ]; then user=$defaultUser; fi
+
+		echo "Connecting to $name ($desc)"
+		echo $'\t' "[$user@$host:$port]"
+		ssh -p $port $host
+	else
+		echo "Connection [$1] not found"
+		printHelp
+	fi
+}
+
+# Loading Config
+if [ -f $configFile ]; then 
+	source $configFile;
+fi
+
+case "$1" in
+[a-z0-9]*)
+	connect $1
+;;
+"--add")
+	addNew
+;;
+"--delete")
+	delete $2
+;;
+"--install")
+	install
+;;
+"--configure")
+	configure
+;;
+*)
+	printHelp
+;;
+esac
+
+exit
