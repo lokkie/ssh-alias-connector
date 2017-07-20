@@ -31,6 +31,6 @@ Done
 ```bash
 fcon example
 Connecting to example (Connection to example com)
-	 [sueruser@example.com:22]
+	 [superuser@example.com:22]
 Password:
 ```
