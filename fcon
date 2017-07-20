@@ -100,10 +100,13 @@ function install {
 
 function configure {
 	systemUser=$(whoami)
-	echo "Enter default user for connectoion [${systemUser}]"
+	echo "Enter default user for connectoion [${systemUser}]:"
 	read defaultUser
 	if [ "$defaultUser" == "" ]; then defaultUser=$systemUser; fi
-	echo "export defaultUser='${defaultUser}'" > $configFile
+	echo "Enter default port for connection [22]:"
+	read defaultPort
+	if [ "$defaultPort" == "" ]; then defaultPort=22; fi
+	echo "export defaultPort='${defaultPort}'" > $configFile
 }
 
 function addNew {
@@ -114,9 +117,9 @@ function addNew {
 	read description
 	echo "Type connection host:"
 	read host
-	echo "Type connection port [2222]:"
+	echo "Type connection port [${defaultPort}]:"
 	read port
-	if [ "$port" == "" ]; then port="2222"; fi
+	if [ "$port" == "" ]; then port=$defaultPort; fi
 	echo "Type user (blank for default: ${defaultUser}):"
 	read user
 	connectionString="$name:$port:$host:$description"
