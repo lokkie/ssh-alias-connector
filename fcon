@@ -100,7 +100,7 @@ function install {
 
 function configure {
 	systemUser=$(whoami)
-	echo "Enter default user for connectoion [${systemUser}]:"
+	echo "Enter default user for connection [${systemUser}]:"
 	read defaultUser
 	if [ "$defaultUser" == "" ]; then defaultUser=$systemUser; fi
 	echo "Enter default port for connection [22]:"
