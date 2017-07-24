@@ -167,7 +167,7 @@ function connect {
 
 		echo "Connecting to $name ($desc)"
 		echo $'\t' "[$user@$host:$port]"
-		ssh -p $port $host
+		ssh -p $port -l $user $host
 	else
 		echo "Connection [$1] not found"
 		printHelp
